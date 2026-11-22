@@ -26,7 +26,7 @@ Lightweight, Markdown-backed Neovim cheatsheet viewer with floating popups, pinn
 ### `vim.pack` (Neovim 0.12+)
 
 ```lua
-vim.pack.add { 'https://github.com/<your-user>/nvim-cheatsheet' }
+vim.pack.add { 'https://github.com/bwot/nvim-cheatsheet' }
 
 require('nvim-cheatsheet').setup {
   keymaps = {
@@ -39,7 +39,7 @@ require('nvim-cheatsheet').setup {
 
 ```lua
 {
-  '<your-user>/nvim-cheatsheet',
+  'bwot/nvim-cheatsheet',
   cmd = 'Cheatsheet',
   opts = {
     keymaps = {
