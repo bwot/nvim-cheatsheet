@@ -95,10 +95,20 @@ Call `require('nvim-cheatsheet').setup(opts)` with any overrides: >lua
 ==============================================================================
 5. CUSTOM & OVERRIDE CHEATSHEETS                      *nvim-cheatsheet-custom*
 
-Place any `.md` file inside `dir` (default: `stdpath('config')/cheatsheet/`):
-  - A new filename (e.g. `git.md`) adds a new sheet with id `git`.
-  - A filename matching a built-in (e.g. `substitute.md`) overrides it.
-  - Pressing `e` on a built-in prompts to copy it into `dir` first.
-  - Deleting the override file restores the bundled built-in sheet.
+Add your own cheatsheets or customize built-ins by placing `.md` files in your
+config's `cheatsheet/` folder (`~/.config/nvim/cheatsheet/` on macOS/Linux,
+`%LOCALAPPDATA%\nvim\cheatsheet\` on Windows, or your configured `dir`):
+
+  - Adding a sheet: create e.g. `my-keymaps.md`. Its filename becomes the ID
+    (`my-keymaps`) and default title (`My Keymaps`), available immediately via
+    `:Cheatsheet my-keymaps` or `:Cheatsheet` without restarting Neovim.
+  - Customizing metadata: set `title`, `key`, or `order` under `sheets` in
+    `setup()` (built-in sheets use orders 10..50).
+  - Overriding a built-in: press `e` while viewing a built-in sheet to copy it
+    into `dir` and edit it, or create a file with a matching filename (e.g.
+    `substitute.md`). Local overrides show `*` in the title and survive plugin
+    updates.
+  - Reverting an override: delete your local file in `dir` to restore the
+    bundled built-in sheet.
 
 vim:tw=78:ts=8:ft=help:norl:
