@@ -1,0 +1,104 @@
+*nvim-cheatsheet.txt*   Markdown-backed floating & pinnable cheatsheets
+
+==============================================================================
+CONTENTS                                            *nvim-cheatsheet-contents*
+
+    1. Introduction ............................ |nvim-cheatsheet-intro|
+    2. Commands ................................ |nvim-cheatsheet-commands|
+    3. Configuration ........................... |nvim-cheatsheet-config|
+    4. Lua API ................................. |nvim-cheatsheet-api|
+    5. Custom & Override Cheatsheets ........... |nvim-cheatsheet-custom|
+
+==============================================================================
+1. INTRODUCTION                                        *nvim-cheatsheet-intro*
+
+`nvim-cheatsheet` displays concise Markdown cheatsheets in a centered floating
+window that can be pinned to a split (`bottom`, `top`, `right`, or `left`) so
+you can keep reading while typing commands in your buffer.
+
+==============================================================================
+2. COMMANDS                                         *nvim-cheatsheet-commands*
+
+:Cheatsheet [arg]                                                *:Cheatsheet*
+    Open or manage cheatsheets. Supports tab completion for all available
+    sheet IDs and subcommands:
+      - `:Cheatsheet` / `:Cheatsheet pick`   Open interactive picker
+      - `:Cheatsheet <id>`                   Open sheet (e.g. `substitute`)
+      - `:Cheatsheet pin`                    Toggle float / pinned split
+      - `:Cheatsheet edit`                   Edit active sheet
+      - `:Cheatsheet close`                  Close cheatsheet window
+
+==============================================================================
+3. CONFIGURATION                                      *nvim-cheatsheet-config*
+
+Call `require('nvim-cheatsheet').setup(opts)` with any overrides: >lua
+
+    require('nvim-cheatsheet').setup {
+      dir = vim.fn.stdpath 'config' .. '/cheatsheet',
+      include_builtins = true,
+      sheets = {},
+      keymaps = false, -- or true, or { prefix = '<leader>h', ... }
+      window = {
+        border = 'rounded',
+        max_width = 0.86,
+        max_height = 0.82,
+        min_width = 68,
+        min_height = 12,
+        conceallevel = 2,
+        concealcursor = 'nc',
+        pin = {
+          position = 'bottom', -- 'bottom' | 'top' | 'right' | 'left'
+          size = 0.36,
+          max_size = 0.45,
+          min_size = 10,
+          return_focus = true,
+        },
+        keys = {
+          close = 'q',
+          close_float = '<Esc>',
+          next = '<Tab>',
+          prev = '<S-Tab>',
+          pin = 'p',
+          edit = 'e',
+        },
+      },
+    }
+<
+
+==============================================================================
+4. LUA API                                               *nvim-cheatsheet-api*
+
+`require('nvim-cheatsheet').setup(opts)`
+    Configure the plugin and optionally register prefix keymaps.
+
+`require('nvim-cheatsheet').open(id)`
+    Open a cheatsheet by ID (or toggle closed if already focused on it).
+
+`require('nvim-cheatsheet').pick()`
+    Open `vim.ui.select` over all available cheatsheets.
+
+`require('nvim-cheatsheet').cycle(step)`
+    Switch to the next (`1`) or previous (`-1`) cheatsheet in place.
+
+`require('nvim-cheatsheet').toggle_pin()`
+    Toggle the active window between floating and pinned split.
+
+`require('nvim-cheatsheet').edit(id)`
+    Edit a sheet's Markdown file. Built-ins prompt before copying to `dir`.
+
+`require('nvim-cheatsheet').close()`
+    Close the cheatsheet window and restore previous window focus.
+
+`require('nvim-cheatsheet').list()`
+    Return the ordered list of discovered cheatsheet tables.
+
+==============================================================================
+5. CUSTOM & OVERRIDE CHEATSHEETS                      *nvim-cheatsheet-custom*
+
+Place any `.md` file inside `dir` (default: `stdpath('config')/cheatsheet/`):
+  - A new filename (e.g. `git.md`) adds a new sheet with id `git`.
+  - A filename matching a built-in (e.g. `substitute.md`) overrides it.
+  - Pressing `e` on a built-in prompts to copy it into `dir` first.
+  - Deleting the override file restores the bundled built-in sheet.
+
+vim:tw=78:ts=8:ft=help:norl:
