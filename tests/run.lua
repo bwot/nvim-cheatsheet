@@ -131,6 +131,132 @@ assert(cs.is_pinned(), 'expected right split pinned')
 assert(vim.wo[vim.api.nvim_get_current_win()].winfixwidth == true, 'expected winfixwidth on right split')
 cs.close()
 
+-- 12. which-key lookup ignores ./which-key.lua in CWD and supports runtimepath + deferred loading
+local orig_cwd = vim.fn.getcwd()
+local cwd_dir = vim.fn.tempname()
+local wk_rtp = vim.fn.tempname()
+vim.fn.mkdir(cwd_dir, 'p')
+vim.fn.mkdir(wk_rtp .. '/lua/which-key', 'p')
+
+vim.fn.writefile({
+  'vim.g.cwd_which_key_loaded = true',
+  "error 'cwd which-key.lua should not be loaded'",
+}, cwd_dir .. '/which-key.lua')
+
+vim.fn.writefile({
+  'local M = { specs = {} }',
+  'function M.add(spec)',
+  '  table.insert(M.specs, spec)',
+  'end',
+  'return M',
+}, wk_rtp .. '/lua/which-key/init.lua')
+
+vim.fn.chdir(cwd_dir)
+package.loaded['which-key'] = nil
+vim.g.cwd_which_key_loaded = nil
+
+cs.setup {
+  dir = tmp_dir,
+  keymaps = {
+    prefix = '<leader>h',
+    group = 'Help / Cheatsheets',
+  },
+}
+vim.api.nvim_exec_autocmds('VimEnter', {})
+vim.api.nvim_exec_autocmds('User', { pattern = 'VeryLazy' })
+assert(vim.g.cwd_which_key_loaded == nil, 'cwd which-key.lua must not be executed')
+assert(package.loaded['which-key'] == nil, 'package.loaded["which-key"] must remain nil')
+
+-- Runtimepath which-key loads and registers even when CWD has which-key.lua
+vim.opt.rtp:append(wk_rtp)
+cs.setup {
+  dir = tmp_dir,
+  keymaps = {
+    prefix = '<leader>h',
+    group = 'Help / Cheatsheets',
+  },
+}
+assert(vim.g.cwd_which_key_loaded == nil, 'cwd which-key.lua must not be executed when rtp has which-key')
+assert(type(package.loaded['which-key']) == 'table', 'expected rtp which-key to load')
+assert(#package.loaded['which-key'].specs == 1, 'expected 1 registered which-key spec')
+assert(package.loaded['which-key'].specs[1][1][1] == '<leader>h', 'expected prefix <leader>h')
+assert(package.loaded['which-key'].specs[1][1].group == 'Help / Cheatsheets', 'expected group label')
+
+-- Deferred VeryLazy registration (when setup runs after VimEnter, as under `nvim -l`)
+vim.opt.rtp:remove(wk_rtp)
+package.loaded['which-key'] = nil
+cs.setup {
+  dir = tmp_dir,
+  keymaps = {
+    prefix = '<leader>h',
+    group = 'Deferred VeryLazy',
+  },
+}
+assert(package.loaded['which-key'] == nil, 'expected which-key nil before VeryLazy')
+assert(vim.g.cwd_which_key_loaded == nil, 'cwd which-key.lua must not run during setup')
+vim.opt.rtp:append(wk_rtp)
+vim.api.nvim_exec_autocmds('User', { pattern = 'VeryLazy' })
+assert(type(package.loaded['which-key']) == 'table', 'expected VeryLazy to load rtp which-key')
+assert(#package.loaded['which-key'].specs == 1, 'expected 1 spec on VeryLazy')
+assert(package.loaded['which-key'].specs[1][1][1] == '<leader>h', 'expected VeryLazy prefix')
+assert(package.loaded['which-key'].specs[1][1].group == 'Deferred VeryLazy', 'expected VeryLazy group')
+
+-- Deferred VimEnter registration during real startup (vim.v.vim_did_enter == 0)
+local startup_script = cwd_dir .. '/startup_check.lua'
+vim.fn.writefile({
+  string.format('local tmp_dir = %q', tmp_dir),
+  string.format('local wk_rtp = %q', wk_rtp),
+  "assert(vim.v.vim_did_enter == 0, 'expected vim_did_enter == 0 during startup')",
+  "require('nvim-cheatsheet').setup {",
+  '  dir = tmp_dir,',
+  '  keymaps = {',
+  "    prefix = '<leader>h',",
+  "    group = 'Deferred VimEnter',",
+  '  },',
+  '}',
+  "assert(vim.g.cwd_which_key_loaded == nil, 'cwd which-key.lua must not run during setup')",
+  "assert(package.loaded['which-key'] == nil, 'which-key must stay nil before rtp is updated')",
+  'vim.opt.rtp:append(wk_rtp)',
+  'vim.schedule(function()',
+  '  local ok, err = pcall(function()',
+  "    assert(vim.v.vim_did_enter == 1, 'expected vim_did_enter == 1 after VimEnter')",
+  "    assert(vim.g.cwd_which_key_loaded == nil, 'cwd which-key.lua must not run on VimEnter')",
+  "    local wk = package.loaded['which-key']",
+  "    assert(type(wk) == 'table', 'expected VimEnter to load rtp which-key')",
+  "    assert(#wk.specs == 1, 'expected 1 spec on VimEnter')",
+  "    assert(wk.specs[1][1][1] == '<leader>h', 'expected VimEnter prefix')",
+  "    assert(wk.specs[1][1].group == 'Deferred VimEnter', 'expected VimEnter group')",
+  '  end)',
+  '  if not ok then',
+  "    io.stderr:write(tostring(err) .. '\\n')",
+  "    vim.cmd 'cquit 1'",
+  '  end',
+  "  vim.cmd 'qall!'",
+  'end)',
+}, startup_script)
+
+local res = vim
+  .system({
+    vim.v.progpath,
+    '--headless',
+    '-u',
+    'NONE',
+    '-i',
+    'NONE',
+    '--cmd',
+    'set rtp+=' .. vim.fn.fnameescape(orig_cwd),
+    '-c',
+    'luafile ' .. vim.fn.fnameescape(startup_script),
+  }, { cwd = cwd_dir, timeout = 5000 })
+  :wait()
+assert(res.code == 0, 'child startup VimEnter test failed: ' .. (res.stderr or ''))
+
+vim.opt.rtp:remove(wk_rtp)
+package.loaded['which-key'] = nil
+vim.fn.chdir(orig_cwd)
+vim.fn.delete(cwd_dir, 'rf')
+vim.fn.delete(wk_rtp, 'rf')
+
 -- Clean up temp dir
 vim.fn.delete(tmp_dir, 'rf')
 

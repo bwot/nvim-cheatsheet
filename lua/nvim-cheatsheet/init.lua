@@ -4,9 +4,20 @@ local ui = require 'nvim-cheatsheet.ui'
 
 local M = {}
 
+local function is_which_key_available()
+  if type(package.loaded['which-key']) == 'table' then
+    return true
+  end
+  return #vim.api.nvim_get_runtime_file('lua/which-key/init.lua', false) > 0
+    or #vim.api.nvim_get_runtime_file('lua/which-key.lua', false) > 0
+end
+
 local function register_which_key(prefix, group)
+  if not is_which_key_available() then
+    return false
+  end
   local ok, wk = pcall(require, 'which-key')
-  if ok and type(wk.add) == 'function' then
+  if ok and type(wk) == 'table' and type(wk.add) == 'function' then
     wk.add { { prefix, group = group } }
     return true
   end
@@ -34,13 +45,32 @@ local function setup_keymaps(km)
   end
 
   if km.which_key ~= false and km.group and km.group ~= '' then
+    local augroup = vim.api.nvim_create_augroup('NvimCheatsheetWhichKey', { clear = true })
     if not register_which_key(prefix, km.group) then
-      vim.api.nvim_create_autocmd('VimEnter', {
-        once = true,
-        callback = function()
-          register_which_key(prefix, km.group)
-        end,
-      })
+      local function schedule_very_lazy()
+        vim.api.nvim_create_autocmd('User', {
+          group = augroup,
+          pattern = 'VeryLazy',
+          once = true,
+          callback = function()
+            register_which_key(prefix, km.group)
+          end,
+        })
+      end
+
+      if vim.v.vim_did_enter == 0 then
+        vim.api.nvim_create_autocmd('VimEnter', {
+          group = augroup,
+          once = true,
+          callback = function()
+            if not register_which_key(prefix, km.group) then
+              schedule_very_lazy()
+            end
+          end,
+        })
+      else
+        schedule_very_lazy()
+      end
     end
   end
 end
